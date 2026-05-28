@@ -273,12 +273,26 @@ If Opus is not available it falls back and prints a notice:
 ⚠  Model: us.anthropic.claude-sonnet-4-6 (Opus not available — enable in Bedrock console for full capability)
 ```
 
+**Newer model notifications:** when a newer model in the same tier exists in the
+Bedrock catalog but is not yet enabled in your account, the launcher prints a
+single yellow notice:
+
+```
+⚠  Newer model available: anthropic.claude-opus-4-8 — enable in Bedrock console → Model access
+```
+
+This only notifies within the same tier — if you are running Opus, it alerts about
+newer Opus models; if running Sonnet, about newer Sonnet models. It does not suggest
+upgrading to a different tier. The notification is informational only and does not
+change behavior. It appears once per session (on the initial probe) and is cached
+along with the model selection for the remainder of the 6-hour session.
+
 The selected model is **cached for the duration of the 6-hour session** — the probe
 runs once per session. Subsequent `claude-personal` launches within the same session
 are instant. The cache clears automatically when your MFA session expires.
 
-**To enable Opus 4.7:** request access in the AWS Console (Bedrock → Model access →
-Modify model access → enable Claude Opus 4.7), then start a new MFA session. The
+**To enable a newer model:** request access in the AWS Console (Bedrock → Model
+access → Modify model access → enable the model), then start a new MFA session. The
 probe will pick it up automatically.
 
 > **Note on new accounts:** Bedrock cross-region inference profiles for Opus models
@@ -373,7 +387,7 @@ the others.
 |---|---|---|
 | Credential storage | Keys stolen from disk | Stored in macOS Keychain (AES-256 encrypted at rest), never written to `~/.aws/credentials` or any plaintext file |
 | Credential access | Silent exfiltration by malware | Credentials are encrypted at rest in macOS Keychain and not accessible from plaintext files — non-Keychain access by other applications triggers a macOS authorization prompt |
-| Credential entry | Session recorders / screen capture | Access key and secret are entered via silent input (`read -s`) — never echoed to the terminal, scrollback buffer, or session logs |
+| Credential entry | Session recorders / screen capture | Access key, secret, and TOTP code are entered via silent input (`read -s`) — never echoed to the terminal, scrollback buffer, or session logs |
 | MFA protocol | Weak second factor | TOTP (RFC 6238) is required — the industry standard rotating 6-digit code. SMS and push-notification MFA are not used |
 | Network access | Keys compromised without MFA | IAM policy requires `aws:MultiFactorAuthPresent` on all Bedrock and Cost Explorer actions — permanent keys alone cannot invoke any model or query any data |
 | Session lifetime | Session token intercepted | Temporary credentials expire after 6 hours and cannot be refreshed without a new MFA code |

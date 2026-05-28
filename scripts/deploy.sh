@@ -440,12 +440,13 @@ export MAX_THINKING_TOKENS="${MAX_THINKING_TOKENS:-10000}"
 # 6-hour session — subsequent launches are instant.
 # Set ANTHROPIC_MODEL in env to skip all probing.
 if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
-  SESSION_CACHE_KEY="${AWS_SESSION_TOKEN:0:16}"
+  SESSION_CACHE_KEY=$(printf '%s' "${AWS_SESSION_TOKEN:0:32}" | shasum -a 256 | cut -c1-16)
   MODEL_CACHE="/tmp/.claude-personal-model-${SESSION_CACHE_KEY}"
 
   if [[ -f "$MODEL_CACHE" ]]; then
     SELECTED_MODEL=$(cut -d'|' -f1 < "$MODEL_CACHE")
     SELECTED_SMALL=$(cut -d'|' -f2 < "$MODEL_CACHE")
+    NEWER_SAME_TIER=$(cut -d'|' -f3 < "$MODEL_CACHE")
   else
     FMODELS_JSON=$(aws bedrock list-foundation-models \
       --region "$AWS_REGION" \
@@ -492,8 +493,6 @@ if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
 
     while IFS= read -r BASE_ID; do
       [[ -n "$BASE_ID" ]] || continue
-      # Once the main model is found, only probe haiku/sonnet for the small model.
-      # Skipping additional opus probes avoids burning limited opus throughput quota.
       if [[ -n "$SELECTED_MODEL" ]] && ! echo "$BASE_ID" | grep -qiE "haiku|sonnet"; then
         continue
       fi
@@ -517,13 +516,41 @@ if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
     fi
     [[ -z "$SELECTED_SMALL" ]] && SELECTED_SMALL="$SELECTED_MODEL"
 
-    echo "${SELECTED_MODEL}|${SELECTED_SMALL}" > "$MODEL_CACHE"
+    # Detect newer models in the same tier that the user hasn't enabled yet.
+    NEWER_SAME_TIER=""
+    if [[ -n "$SELECTED_MODEL" ]]; then
+      SELECTED_TIER=""
+      if echo "$SELECTED_MODEL" | grep -qi "opus"; then SELECTED_TIER="opus"
+      elif echo "$SELECTED_MODEL" | grep -qi "sonnet"; then SELECTED_TIER="sonnet"
+      elif echo "$SELECTED_MODEL" | grep -qi "haiku"; then SELECTED_TIER="haiku"
+      fi
+
+      if [[ -n "$SELECTED_TIER" ]]; then
+        # Get all catalog models in the same tier, sorted descending (newest first).
+        SAME_TIER_ALL=$(echo "$RANKED_IDS" | grep -i "$SELECTED_TIER" || true)
+        # The selected model base ID (strip "us." prefix for comparison).
+        SELECTED_BASE="${SELECTED_MODEL#us.}"
+        # Any catalog model that sorts above the selected one is newer and not accessible.
+        while IFS= read -r CATALOG_ID; do
+          [[ -z "$CATALOG_ID" ]] && continue
+          [[ "$CATALOG_ID" == "$SELECTED_BASE" ]] && break
+          NEWER_SAME_TIER="$CATALOG_ID"
+          break
+        done <<< "$SAME_TIER_ALL"
+      fi
+    fi
+
+    echo "${SELECTED_MODEL}|${SELECTED_SMALL}|${NEWER_SAME_TIER}" > "$MODEL_CACHE"
   fi
 
   if echo "$SELECTED_MODEL" | grep -qi "opus"; then
     printf "${GREEN}✓${NC}  Model: %s\n" "$SELECTED_MODEL"
   else
     printf "${YELLOW}⚠${NC}  Model: %s (Opus not available — enable in Bedrock console for full capability)\n" "$SELECTED_MODEL"
+  fi
+
+  if [[ -n "$NEWER_SAME_TIER" ]]; then
+    printf "${YELLOW}⚠${NC}  Newer model available: %s — enable in Bedrock console → Model access\n" "$NEWER_SAME_TIER"
   fi
 
   export ANTHROPIC_MODEL="$SELECTED_MODEL"
