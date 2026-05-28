@@ -105,6 +105,7 @@ Paste the following, then name it `bedrock_mfa_policy` and save:
         "budgets:CreateBudget",
         "budgets:ModifyBudget",
         "budgets:DeleteBudget",
+        "budgets:ViewBudget",
         "budgets:DescribeBudgets",
         "sns:CreateTopic",
         "sns:DeleteTopic",
