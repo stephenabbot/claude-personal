@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy this directory to roles/<your-role-name>/ and edit both files.",
+  "description": "Short description of what this role grants",
+  "maxSessionDuration": 21600,
+  "permissionBoundary": ""
+}

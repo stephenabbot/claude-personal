@@ -1,0 +1,15 @@
+{
+  "_comment": "Example policy — copy this directory and edit to create a custom role.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DescribeYourActions",
+      "Effect": "Allow",
+      "Action": [
+        "service:Action1",
+        "service:Action2"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

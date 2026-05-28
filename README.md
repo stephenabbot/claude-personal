@@ -4,6 +4,18 @@ Run Claude Code on your personal Mac using AWS Bedrock — no Pro plan required.
 
 ---
 
+> **DISCLAIMER:** This software is provided "as is" without warranty of any kind.
+> The author accepts no responsibility or liability for any damage, data loss,
+> service disruption, financial charges, security incidents, or any other adverse
+> outcomes resulting from the use of this project. This includes — but is not limited
+> to — actions taken by AI agents operating under IAM roles deployed by this project.
+> The `operator` role grants **unrestricted administrator access** to your AWS account.
+> By using this software, you acknowledge that you understand the risks involved and
+> accept full responsibility for all consequences of its use. See
+> [Operational Roles — Disclaimer](docs/operational-roles.md#disclaimer) for full details.
+
+---
+
 ## Why this exists
 
 Claude.ai Pro is a subscription service with hard usage limits: a rolling message
@@ -28,6 +40,9 @@ This project provides a small set of scripts that handle the full lifecycle:
 | `scripts/deploy.sh` | One-time setup — validates prerequisites, stores credentials in macOS Keychain, installs Claude Code |
 | `scripts/auth-bedrock.sh` | Sourced at session start — retrieves credentials from Keychain, prompts for MFA, exchanges for a 6-hour AWS session |
 | `~/bin/claude-personal` | Launcher — checks for an active session, auto-updates Claude Code if needed, probes for the best available model, sets Bedrock env vars, launches Claude |
+| `scripts/deploy-role.sh` | Deploy or update an operational role via CloudFormation (`--all` for all roles) |
+| `scripts/list-roles.sh` | Show deployed role stacks, status, ARNs, and last-updated time |
+| `scripts/destroy-role.sh` | Delete a specific role stack (prompts for confirmation) |
 | `scripts/destroy.sh` | Full uninstall — removes Keychain entries, npm package, and launcher |
 | `scripts/test_creds.sh` | Verification — end-to-end connectivity test from Keychain through to Bedrock |
 | `config.sh` | Optional tag overrides (Owner, Environment, DeploymentId) — committed to repo, no secrets |
@@ -122,6 +137,12 @@ Paste the following, then name it `bedrock_mfa_policy` and save:
 }
 ```
 
+> **Using operational roles?** If you plan to use `claude-personal --role analyst`
+> or `--role operator`, you will also need to add an `sts:AssumeRole` statement
+> to this policy. See
+> [Operational Roles — Prerequisites](docs/operational-roles.md#prerequisite-base-user-policy-update)
+> for the exact statement to add.
+
 **Why four separate statements:**
 `GetSessionToken` is the call that establishes an MFA-authenticated session.
 The `aws:MultiFactorAuthPresent` condition key is not evaluated during this call —
@@ -138,8 +159,8 @@ API request itself, not enforced by IAM. However since this account is used
 exclusively for Bedrock, there is nothing else to expose. The four actions granted
 are read-only — no ability to modify cost categories or access billing settings.
 
-**Note on Budgets and SNS scope:** The budget and SNS actions are used by
-`scripts/alarms.sh` to create a monthly spend alert with email notification.
+**Note on Budgets and SNS scope:** The budget and SNS actions will be used by
+a planned `scripts/alarms.sh` to create a monthly spend alert with email notification.
 AWS Budgets uses a coarse permission model: `budgets:ModifyBudget` covers
 create, modify, and delete operations; `budgets:ViewBudget` covers all reads.
 These are scoped to budget management only — no access to billing data, cost
@@ -299,43 +320,35 @@ Setting `ANTHROPIC_MODEL` in your environment skips the probe entirely.
 
 ---
 
-## Planned: role-based access for AWS operations
+## Operational roles
 
-> **Status:** design complete, implementation pending. See [TODO.md](TODO.md) for details.
+This project also supports granting Claude scoped authority beyond model invocation —
+read-only AWS analysis, log inspection, resource modification — via assumable IAM
+roles. See [Operational Roles](docs/operational-roles.md) for full documentation.
 
-Today this project gives Claude exactly one capability: invoking Bedrock models. But
-Claude Code's real power is acting as your proxy — running CLI commands, analyzing
-deployed infrastructure, reading CloudWatch logs, inspecting resources, and
-occasionally making changes on your behalf.
-
-The planned extension uses **IAM AssumeRole** to grant Claude scoped authority beyond
-model invocation:
-
-| Role | Scope | Use case |
-|---|---|---|
-| `claude-bedrock` | Model invocation only | Current default — unchanged |
-| `claude-analyst` | Broad read-only | Log analysis, resource inspection, cost review, configuration audit |
-| `claude-operator` | Read + write | Deployments, remediation, resource modification |
-
-**How it will work:**
+**Quick overview:**
 
 ```bash
-claude-personal                    # default: bedrock only
-claude-personal --role analyst     # broad read access to the account
+claude-personal                    # default: bedrock only (no AWS operational access)
+claude-personal --role analyst     # broad read-only access to the account
 claude-personal --role operator    # read + write access
 ```
 
-The base user (`a_bedrock_user`) gains only `sts:AssumeRole` — it remains the
-authentication gateway, not the authorization surface. Each role has its own trust
-policy requiring MFA, its own permission boundary, and its own IaC definition that
-can be PR-reviewed and versioned.
+| Role | Scope | Use case |
+|---|---|---|
+| (default) | Model invocation only | Coding assistance — no AWS CLI access |
+| `analyst` | Broad read-only | Log analysis, resource inspection, cost review, configuration audit |
+| `operator` | **Full administrator** (Action: \*, Resource: \*) | Unrestricted operations — use with extreme caution |
+
+Roles are defined as directories under `roles/` — each containing an IAM policy
+document and a config file. Deployed as independent CloudFormation stacks. Add a
+custom role by copying `roles/_example/`, editing the policy, and running
+`scripts/deploy-role.sh <name>`.
 
 **Why this matters for corporate adoption:** this pattern maps directly to how
-enterprises manage AI tool access — least privilege by default, explicit escalation,
-full CloudTrail audit trail, role revocation without breaking base access, and
-governance review via infrastructure-as-code. The project serves as a minimal
-proof-of-concept for authorized AI agent access in environments with compliance
-requirements.
+enterprises manage AI tool access — least privilege by default, explicit escalation
+via `--role`, full CloudTrail audit trail, role revocation without breaking base
+access, and governance review via infrastructure-as-code policy files.
 
 ---
 

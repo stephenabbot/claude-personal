@@ -79,7 +79,8 @@ ok "Credentials retrieved  (account: $ACCOUNT_ID)"
 # ── prompt for mfa token ──────────────────────────────────────────────────────
 
 echo
-read -rp "Enter TOTP MFA code for $IAM_USER: " MFA_TOKEN
+read -rsp "Enter TOTP MFA code for $IAM_USER: " MFA_TOKEN
+echo
 
 [[ -z "$MFA_TOKEN" ]]              && fail "No MFA code entered."
 [[ ! "$MFA_TOKEN" =~ ^[0-9]{6}$ ]] && fail "MFA code must be exactly 6 digits (got: '$MFA_TOKEN')."

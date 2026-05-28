@@ -1,0 +1,5 @@
+{
+  "description": "CAUTION: Full administrator access (Action: *, Resource: *) - use with extreme care",
+  "maxSessionDuration": 3600,
+  "permissionBoundary": ""
+}

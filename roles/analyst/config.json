@@ -1,0 +1,5 @@
+{
+  "description": "Broad read-only access for inspection, log analysis, and configuration audit",
+  "maxSessionDuration": 21600,
+  "permissionBoundary": ""
+}

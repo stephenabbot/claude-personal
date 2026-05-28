@@ -95,10 +95,6 @@ else
   PREREQ_FAILED=1
 fi
 
-if command -v jq &>/dev/null; then
-  pass "jq" "$(jq --version 2>/dev/null)"
-fi
-
 warn "TOTP authenticator app" "verify IAM user MFA is enrolled before continuing"
 
 echo ""
@@ -279,7 +275,7 @@ ACTION_COUNT=0
 if [[ "$NEED_KEYCHAIN"  -eq 1 ]]; then printf "  ${CYAN}·${NC}  Prompt for missing credentials and store in macOS Keychain\n"; ACTION_COUNT=$((ACTION_COUNT+1)); fi
 if [[ "$NEED_NPM"       -eq 1 ]]; then printf "  ${CYAN}·${NC}  Install / update Claude Code via npm\n";                       ACTION_COUNT=$((ACTION_COUNT+1)); fi
 if [[ "$NEED_LAUNCHER"  -eq 1 ]]; then printf "  ${CYAN}·${NC}  Install launcher to %s\n" "$LAUNCHER";                        ACTION_COUNT=$((ACTION_COUNT+1)); fi
-if [[ "$NEED_PATH"      -eq 1 ]]; then printf "  ${CYAN}·${NC}  Add ~/bin to PATH in ~/.zshrc\n";                             ACTION_COUNT=$((ACTION_COUNT+1)); fi
+if [[ "$NEED_PATH"      -eq 1 ]]; then printf "  ${CYAN}·${NC}  Add ~/bin to PATH in %s\n" "$SHELL_RC";                       ACTION_COUNT=$((ACTION_COUNT+1)); fi
 
 if [[ "$ACTION_COUNT" -eq 0 ]]; then
   echo ""
@@ -373,20 +369,45 @@ NC='\033[0m'
 PROJECT_DIR="$HOME/projects/claude-personal"
 CLAUDE_BIN="$PROJECT_DIR/node_modules/.bin/claude"
 AUTH_SCRIPT="$PROJECT_DIR/scripts/auth-bedrock.sh"
+ROLES_DIR="$PROJECT_DIR/roles"
+
+# ── parse --role flag ─────────────────────────────────────────────────────────
+ASSUME_ROLE=""
+CLAUDE_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --role)
+      [[ $# -lt 2 ]] && { echo "ERROR: --role requires a name (e.g. --role analyst)"; exit 1; }
+      ASSUME_ROLE="$2"
+      shift 2
+      ;;
+    --role=*)
+      ASSUME_ROLE="${1#--role=}"
+      shift
+      ;;
+    *)
+      CLAUDE_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
 
 # ── node bootstrap ────────────────────────────────────────────────────────────
 # Try to locate node across the most common Mac version manager setups before
 # failing. Handles fnm, nvm, and direct Homebrew installs transparently.
 if ! command -v node &>/dev/null; then
+  # fnm (Fast Node Manager)
   if command -v fnm &>/dev/null; then
     eval "$(fnm env 2>/dev/null)" && command -v node &>/dev/null
   fi
 fi
 if ! command -v node &>/dev/null; then
+  # nvm
   NVM_INIT="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
   [[ -s "$NVM_INIT" ]] && source "$NVM_INIT" 2>/dev/null
 fi
 if ! command -v node &>/dev/null; then
+  # Homebrew (Apple Silicon and Intel paths)
   for NODE_PATH in /opt/homebrew/bin /usr/local/bin; do
     [[ -x "$NODE_PATH/node" ]] && export PATH="$NODE_PATH:$PATH" && break
   done
@@ -408,6 +429,8 @@ if [[ ! -f "$AUTH_SCRIPT" ]]; then
 fi
 
 # ── auto-update ───────────────────────────────────────────────────────────────
+# Checks Anthropic's npm registry on every launch and updates silently if a
+# newer version is available. One-line output only if an update occurred.
 INSTALLED_VER="$("$CLAUDE_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "0")"
 LATEST_VER="$(npm view @anthropic-ai/claude-code version 2>/dev/null || echo "")"
 if [[ -n "$LATEST_VER" && "$INSTALLED_VER" != "$LATEST_VER" ]]; then
@@ -435,10 +458,9 @@ export MAX_THINKING_TOKENS="${MAX_THINKING_TOKENS:-10000}"
 # ── model selection ───────────────────────────────────────────────────────────
 # Discovers the best Claude model your account has access to. On first launch
 # of a session, queries list-foundation-models to get real model IDs for this
-# region, then probes in capability order (opus > sonnet > haiku) with an
-# 8-second timeout per model. Result is cached in /tmp for the duration of the
-# 6-hour session — subsequent launches are instant.
-# Set ANTHROPIC_MODEL in env to skip all probing.
+# region, then probes in capability order (opus > sonnet > haiku). Result is
+# cached in /tmp for the duration of the 6-hour session — subsequent launches
+# are instant. Set ANTHROPIC_MODEL in env to skip all probing.
 if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
   SESSION_CACHE_KEY=$(printf '%s' "${AWS_SESSION_TOKEN:0:32}" | shasum -a 256 | cut -c1-16)
   MODEL_CACHE="/tmp/.claude-personal-model-${SESSION_CACHE_KEY}"
@@ -526,11 +548,8 @@ if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
       fi
 
       if [[ -n "$SELECTED_TIER" ]]; then
-        # Get all catalog models in the same tier, sorted descending (newest first).
         SAME_TIER_ALL=$(echo "$RANKED_IDS" | grep -i "$SELECTED_TIER" || true)
-        # The selected model base ID (strip "us." prefix for comparison).
         SELECTED_BASE="${SELECTED_MODEL#us.}"
-        # Any catalog model that sorts above the selected one is newer and not accessible.
         while IFS= read -r CATALOG_ID; do
           [[ -z "$CATALOG_ID" ]] && continue
           [[ "$CATALOG_ID" == "$SELECTED_BASE" ]] && break
@@ -559,11 +578,55 @@ else
   export ANTHROPIC_SMALL_FAST_MODEL="${ANTHROPIC_SMALL_FAST_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
 fi
 
-printf '\033]0;Claude [%s]\007' "$ACCOUNT_ID"
+# ── role assumption ───────────────────────────────────────────────────────────
+ROLE_CONTEXT=""
+if [[ -n "$ASSUME_ROLE" ]]; then
+  ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/claude-personal-role-${ASSUME_ROLE}"
+
+  # Verify role directory exists locally
+  if [[ ! -d "$ROLES_DIR/$ASSUME_ROLE" ]]; then
+    printf "${RED}✗${NC}  Role '%s' not found in %s\n" "$ASSUME_ROLE" "$ROLES_DIR"
+    printf "   Available roles:\n"
+    for dir in "$ROLES_DIR"/*/; do
+      local_name=$(basename "$dir")
+      [[ "$local_name" == "_example" ]] && continue
+      [[ -f "$dir/policy.json" ]] || continue
+      printf "     - %s\n" "$local_name"
+    done
+    exit 1
+  fi
+
+  # Assume the role using the existing MFA session
+  ROLE_CREDS=$(aws sts assume-role \
+    --role-arn "$ROLE_ARN" \
+    --role-session-name "claude-personal-${ASSUME_ROLE}-$(date +%s)" \
+    --output json 2>&1)
+
+  if [[ $? -ne 0 ]]; then
+    printf "${RED}✗${NC}  Failed to assume role: %s\n" "$ROLE_ARN"
+    printf "   %s\n" "$ROLE_CREDS"
+    printf "   Ensure the role is deployed: scripts/deploy-role.sh %s\n" "$ASSUME_ROLE"
+    exit 1
+  fi
+
+  # Export role credentials — these override the MFA session creds for all
+  # aws CLI calls including Bedrock. This works because all role policies
+  # include bedrock:InvokeModel and bedrock:InvokeModelWithResponseStream.
+  export AWS_ACCESS_KEY_ID=$(echo "$ROLE_CREDS" | jq -r '.Credentials.AccessKeyId')
+  export AWS_SECRET_ACCESS_KEY=$(echo "$ROLE_CREDS" | jq -r '.Credentials.SecretAccessKey')
+  export AWS_SESSION_TOKEN=$(echo "$ROLE_CREDS" | jq -r '.Credentials.SessionToken')
+
+  ROLE_EXPIRATION=$(echo "$ROLE_CREDS" | jq -r '.Credentials.Expiration')
+  printf "${GREEN}✓${NC}  Role assumed: %s (expires: %s)\n" "$ASSUME_ROLE" "$ROLE_EXPIRATION"
+
+  ROLE_CONTEXT=" Role: $ASSUME_ROLE (claude-personal-role-${ASSUME_ROLE})."
+fi
+
+printf '\033]0;Claude [%s]%s\007' "$ACCOUNT_ID" "${ASSUME_ROLE:+ ($ASSUME_ROLE)}"
 
 exec "$CLAUDE_BIN" \
-  --append-system-prompt "AWS account: $ACCOUNT_ID (user: $IAM_USER)." \
-  "$@"
+  --append-system-prompt "AWS account: $ACCOUNT_ID (user: $IAM_USER).${ROLE_CONTEXT}" \
+  "${CLAUDE_ARGS[@]}"
 LAUNCHER_SCRIPT
 
   chmod +x "$LAUNCHER"

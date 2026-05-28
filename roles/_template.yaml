@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Claude-personal operational role — assumed via MFA for scoped AWS access
+
+Parameters:
+  RoleName:
+    Type: String
+    Description: Role name suffix (e.g. analyst, operator)
+    AllowedPattern: '[a-z0-9-]+'
+  TrustedUserArn:
+    Type: String
+    Description: ARN of the IAM user allowed to assume this role
+  PolicyDocument:
+    Type: String
+    # Passed as a JSON string; CloudFormation auto-converts to JSON object for Policies[].PolicyDocument
+    Description: JSON IAM policy document
+  RoleDescription:
+    Type: String
+    Description: Human-readable description of the role
+    Default: Claude-personal operational role
+  MaxSessionDuration:
+    Type: Number
+    Description: Maximum session duration in seconds (900-43200)
+    Default: 21600
+    MinValue: 900
+    MaxValue: 43200
+  PermissionBoundaryArn:
+    Type: String
+    Description: Optional permission boundary ARN (leave empty for none)
+    Default: ''
+  Owner:
+    Type: String
+    Default: ''
+  Environment:
+    Type: String
+    Default: prd
+  DeploymentId:
+    Type: String
+    Default: Default
+  Project:
+    Type: String
+    Default: claude-personal
+  Repository:
+    Type: String
+    Default: ''
+
+Conditions:
+  HasPermissionBoundary: !Not [!Equals [!Ref PermissionBoundaryArn, '']]
+  HasRepository: !Not [!Equals [!Ref Repository, '']]
+  HasOwner: !Not [!Equals [!Ref Owner, '']]
+
+Resources:
+  OperationalRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'claude-personal-role-${RoleName}'
+      Description: !Ref RoleDescription
+      MaxSessionDuration: !Ref MaxSessionDuration
+      PermissionsBoundary: !If [HasPermissionBoundary, !Ref PermissionBoundaryArn, !Ref 'AWS::NoValue']
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref TrustedUserArn
+            Action: sts:AssumeRole
+            Condition:
+              Bool:
+                'aws:MultiFactorAuthPresent': 'true'
+      Policies:
+        - PolicyName: !Sub 'claude-personal-policy-${RoleName}'
+          PolicyDocument: !Ref PolicyDocument
+      Tags:
+        - Key: Name
+          Value: !Sub 'claude-personal-role-${RoleName}'
+        - Key: ManagedBy
+          Value: claude-personal-scripts
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DeploymentId
+          Value: !Ref DeploymentId
+        - !If
+          - HasOwner
+          - Key: Owner
+            Value: !Ref Owner
+          - !Ref 'AWS::NoValue'
+        - !If
+          - HasRepository
+          - Key: Repository
+            Value: !Ref Repository
+          - !Ref 'AWS::NoValue'
+
+Outputs:
+  RoleArn:
+    Description: ARN of the created role
+    Value: !GetAtt OperationalRole.Arn
+  RoleName:
+    Description: Name of the created role
+    Value: !Ref OperationalRole
