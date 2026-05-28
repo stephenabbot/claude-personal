@@ -180,33 +180,22 @@ Security credentials tab → **Access keys** → **Create access key**:
 2. Click through the advisory
 3. **Copy both values immediately** — the secret is only shown once
 
-### 5. Enable Bedrock and request model access
+### 5. Verify Bedrock model access
 
-Bedrock is not enabled by default and model access must be explicitly requested
-per AWS account per region.
+Serverless foundation models on Bedrock are now **automatically enabled** across all
+AWS commercial regions when first invoked — no manual activation required. The
+retired "Model access" page is no longer needed.
 
-**Enable Bedrock in your region:**
-1. Open the AWS Console and switch to your target region (default: `us-east-1`)
-2. Navigate to **Amazon Bedrock**
-3. If prompted, click **Get started** to enable the service
+> **First-time Anthropic users:** you may need to submit use case details before
+> models respond. Navigate to **Amazon Bedrock** in the console, select any
+> Anthropic model from the **Model catalog**, and follow the prompts if presented.
 
-**Request Claude model access:**
-1. In the Bedrock console left nav → **Model access**
-2. Click **Modify model access**
-3. Select the Anthropic Claude models you want — recommended minimum:
-   - Claude Sonnet 4.x (capable, cost-effective)
-   - Claude Haiku 4.x (fast, cheapest — used for background tasks)
-4. Click **Save changes** — access is typically granted within a few minutes
-5. Verify: model status changes from **Available** to **Access granted**
+Access control is managed entirely through IAM policies and Service Control Policies.
+The IAM policy in this project already grants `bedrock:InvokeModel` and
+`bedrock:InvokeModelWithResponseStream` — no additional console steps are needed.
 
-> **Region note:** Model access is per-region. If you change `AWS_REGION` in the
-> launcher you must enable model access in that region separately.
->
-> **Opus note:** Some Opus models may require a brief manual review by AWS before
-> access is granted — allow up to 24 hours.
-
-Run `source scripts/test_creds.sh` after enabling access — it performs a live
-invocation test to confirm models are reachable, not just listed.
+Run `source scripts/test_creds.sh` after setup — it performs a live invocation test
+to confirm models are reachable.
 
 ---
 
@@ -270,15 +259,15 @@ The launcher prints the selected model at startup:
 If Opus is not available it falls back and prints a notice:
 
 ```
-⚠  Model: us.anthropic.claude-sonnet-4-6 (Opus not available — enable in Bedrock console for full capability)
+⚠  Model: us.anthropic.claude-sonnet-4-6 (Opus not available — check IAM policy or try invoking once in console)
 ```
 
 **Newer model notifications:** when a newer model in the same tier exists in the
-Bedrock catalog but is not yet enabled in your account, the launcher prints a
-single yellow notice:
+Bedrock catalog but did not respond during probing, the launcher prints a single
+yellow notice:
 
 ```
-⚠  Newer model available: anthropic.claude-opus-4-8 — enable in Bedrock console → Model access
+⚠  Newer model available: anthropic.claude-opus-4-8 — try invoking in Bedrock console to activate
 ```
 
 This only notifies within the same tier — if you are running Opus, it alerts about
@@ -287,13 +276,13 @@ upgrading to a different tier. The notification is informational only and does n
 change behavior. It appears once per session (on the initial probe) and is cached
 along with the model selection for the remainder of the 6-hour session.
 
+Since Bedrock models are auto-enabled on first invocation, the fix is typically to
+invoke the model once via the Bedrock console playground or check that your IAM
+policy does not restrict access to that specific model.
+
 The selected model is **cached for the duration of the 6-hour session** — the probe
 runs once per session. Subsequent `claude-personal` launches within the same session
 are instant. The cache clears automatically when your MFA session expires.
-
-**To enable a newer model:** request access in the AWS Console (Bedrock → Model
-access → Modify model access → enable the model), then start a new MFA session. The
-probe will pick it up automatically.
 
 > **Note on new accounts:** Bedrock cross-region inference profiles for Opus models
 > have low default throughput limits that increase with usage. If Opus is selected

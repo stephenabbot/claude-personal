@@ -197,8 +197,8 @@ if [[ "$BEDROCK_MODEL_OK" -eq 1 ]]; then
   pass "Bedrock model access" "$BEDROCK_TEST_MODEL"
 else
   miss "Bedrock model access" "no Claude model responded in $BEDROCK_REGION"
-  printf "       ${CYAN}Fix: AWS Console → Amazon Bedrock → Model access → Modify model access${NC}\n"
-  printf "       ${CYAN}     Enable Anthropic Claude models, then re-run deploy.sh${NC}\n"
+  printf "       ${CYAN}Fix: Try invoking an Anthropic model once in the Bedrock console playground${NC}\n"
+  printf "       ${CYAN}     First-time users may need to submit use case details before access is granted${NC}\n"
   printf "       ${CYAN}     Once enabled, run: source scripts/test_creds.sh  to verify${NC}\n"
 fi
 
@@ -510,8 +510,8 @@ if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
 
     if [[ -z "$SELECTED_MODEL" ]]; then
       printf "${RED}✗${NC}  No Claude models with access found in %s.\n" "$AWS_REGION"
-      printf "   Fix: AWS Console → Amazon Bedrock → Model access → Modify model access\n"
-      printf "        Enable at least one Anthropic Claude model, then re-run.\n"
+      printf "   Fix: Try invoking an Anthropic model once in the Bedrock console playground.\n"
+      printf "        First-time users may need to submit use case details. Check IAM policy if issue persists.\n"
       exit 1
     fi
     [[ -z "$SELECTED_SMALL" ]] && SELECTED_SMALL="$SELECTED_MODEL"
@@ -546,11 +546,11 @@ if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
   if echo "$SELECTED_MODEL" | grep -qi "opus"; then
     printf "${GREEN}✓${NC}  Model: %s\n" "$SELECTED_MODEL"
   else
-    printf "${YELLOW}⚠${NC}  Model: %s (Opus not available — enable in Bedrock console for full capability)\n" "$SELECTED_MODEL"
+    printf "${YELLOW}⚠${NC}  Model: %s (Opus not available — try invoking once in Bedrock console or check IAM policy)\n" "$SELECTED_MODEL"
   fi
 
   if [[ -n "$NEWER_SAME_TIER" ]]; then
-    printf "${YELLOW}⚠  Newer model available: %s — enable in Bedrock console → Model access${NC}\n" "$NEWER_SAME_TIER"
+    printf "${YELLOW}⚠  Newer model available: %s — try invoking in Bedrock console to activate${NC}\n" "$NEWER_SAME_TIER"
   fi
 
   export ANTHROPIC_MODEL="$SELECTED_MODEL"

@@ -135,7 +135,7 @@ MODELS_JSON=$(aws bedrock list-foundation-models \
   --output json \
   --query 'modelSummaries[?contains(modelId, `anthropic`)].modelId' 2>&1) \
   || fail "Bedrock list-foundation-models failed. Common causes:
-     - Bedrock not enabled  (AWS Console → Bedrock → Model access)
+     - Bedrock not reachable (check IAM policy includes bedrock:ListFoundationModels)
      - IAM policy missing bedrock:ListFoundationModels
      - Region $REGION may not support Bedrock — try us-west-2
      AWS response: $MODELS_JSON"
@@ -147,9 +147,8 @@ echo "$MODELS_JSON" | jq -r '.[]' | while read -r m; do
 done
 
 # ── verify model access (invocation test) ─────────────────────────────────────
-# list-foundation-models returns all models in the region regardless of whether
-# your account has been granted access. A minimal invocation is the only reliable
-# way to confirm access is actually enabled.
+# Models are auto-enabled on first invocation, but first-time Anthropic users may
+# need to submit use case details. A live invocation confirms end-to-end access.
 
 step "Verifying model access (invocation test)..."
 
@@ -178,9 +177,10 @@ else
     ok "Model access confirmed — $TEST_MODEL responded"
   else
     if echo "$INVOKE_RESULT" | grep -qi "don't have access\|not have access\|model access\|AccessDeniedException"; then
-      fail "Model access not enabled for: $TEST_MODEL
-     Fix: AWS Console → Amazon Bedrock → Model access → Modify model access
-          Enable Anthropic Claude models, wait a few minutes, then re-run."
+      fail "Model not accessible: $TEST_MODEL
+     Fix: Try invoking the model once in the Bedrock console playground.
+          First-time Anthropic users may need to submit use case details.
+          If issue persists, check that your IAM policy allows bedrock:InvokeModel."
     else
       fail "Invocation test failed for $TEST_MODEL:
      $INVOKE_RESULT"
