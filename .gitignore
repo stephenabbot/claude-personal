@@ -1,0 +1,40 @@
+# ── npm ───────────────────────────────────────────────────────────────────────
+node_modules/
+package-lock.json
+npm-debug.log*
+.npm/
+
+# ── aws credentials ───────────────────────────────────────────────────────────
+# These should never exist in this project, but block them as a safety net.
+.aws/
+credentials
+*.pem
+*.key
+
+# ── environment files ─────────────────────────────────────────────────────────
+.env
+.env.*
+*.env
+
+# ── session & working documents ───────────────────────────────────────────────
+# CONTEXT.md is a session working document — may contain instance-specific notes.
+# Exclude it from public commits; each user maintains their own local copy.
+CONTEXT.md
+
+# ── macos ─────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── editors & ides ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── logs & temp files ─────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.temp
