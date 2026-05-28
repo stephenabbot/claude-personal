@@ -102,11 +102,8 @@ Paste the following, then name it `bedrock_mfa_policy` and save:
       "Sid": "AllowBudgetAlertsWithMFA",
       "Effect": "Allow",
       "Action": [
-        "budgets:CreateBudget",
-        "budgets:ModifyBudget",
-        "budgets:DeleteBudget",
         "budgets:ViewBudget",
-        "budgets:DescribeBudgets",
+        "budgets:ModifyBudget",
         "sns:CreateTopic",
         "sns:DeleteTopic",
         "sns:Subscribe",
@@ -143,11 +140,12 @@ are read-only — no ability to modify cost categories or access billing setting
 
 **Note on Budgets and SNS scope:** The budget and SNS actions are used by
 `scripts/alarms.sh` to create a monthly spend alert with email notification.
-`budgets:CreateBudget` and `budgets:ModifyBudget` are write actions, but they
-are scoped to budget management only — no access to billing data, cost categories,
-or other AWS resources. SNS actions are similarly limited: create a topic,
-subscribe an email address, and manage that topic. No ability to publish arbitrary
-messages or access other SNS topics.
+AWS Budgets uses a coarse permission model: `budgets:ModifyBudget` covers
+create, modify, and delete operations; `budgets:ViewBudget` covers all reads.
+These are scoped to budget management only — no access to billing data, cost
+categories, or other AWS resources. SNS actions are similarly limited: create a
+topic, subscribe an email address, and manage that topic. No ability to publish
+arbitrary messages or access other SNS topics.
 
 ### 3. Enable virtual MFA
 
