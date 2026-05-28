@@ -14,9 +14,8 @@ session, re-establishing context, and losing the flow of work.
 
 AWS Bedrock is pay-as-you-go. There are no session time limits, no message quotas,
 and no subscription. You are billed per token at rates that for personal use
-typically amount to a few dollars a month. Claude Code running against Bedrock
-behaves identically to the Pro plan version — same models, same capabilities —
-but without the interruptions.
+typically amount to a few dollars a month. Claude Code running against Bedrock uses the same Claude models and
+capabilities as Claude Pro — but without the interruptions.
 
 ---
 
@@ -331,7 +330,7 @@ and `DeploymentId`. It is committed to the repo and contains no secrets:
 
 ## Cost
 
-Bedrock charges per token. Typical personal usage with Claude Sonnet runs
+Bedrock charges per token. Typical light personal usage with Claude Sonnet runs
 **$1–5/month**. Opus models cost more. There are no minimum charges, no
 subscription fees, and no usage outside of what you explicitly invoke.
 
@@ -341,9 +340,9 @@ Current Bedrock pricing: https://aws.amazon.com/bedrock/pricing/
 
 ## Data privacy
 
-When you run Claude Code via this project, all inference happens inside your own
-AWS account. Your prompts, responses, and conversation content never leave your
-account boundary.
+When you run Claude Code via this project, all inference happens through AWS Bedrock within your own
+AWS account. Your prompts, responses, and conversation content never leave AWS's
+Bedrock environment and are not shared with Anthropic.
 
 **AWS Bedrock does not use API inputs or outputs to train models.** This is
 contractually guaranteed and applies to all Bedrock API traffic. It is distinct
@@ -377,7 +376,7 @@ the others.
 | Layer | Threat | Mitigation |
 |---|---|---|
 | Credential storage | Keys stolen from disk | Stored in macOS Keychain (AES-256 encrypted at rest), never written to `~/.aws/credentials` or any plaintext file |
-| Credential access | Silent exfiltration by malware | Keychain access triggers a macOS authorization prompt — no process can read credentials silently |
+| Credential access | Silent exfiltration by malware | Credentials are encrypted at rest in macOS Keychain and not accessible from plaintext files — non-Keychain access by other applications triggers a macOS authorization prompt |
 | Credential entry | Session recorders / screen capture | Access key and secret are entered via silent input (`read -s`) — never echoed to the terminal, scrollback buffer, or session logs |
 | MFA protocol | Weak second factor | TOTP (RFC 6238) is required — the industry standard rotating 6-digit code. SMS and push-notification MFA are not used |
 | Network access | Keys compromised without MFA | IAM policy requires `aws:MultiFactorAuthPresent` on all Bedrock and Cost Explorer actions — permanent keys alone cannot invoke any model or query any data |
