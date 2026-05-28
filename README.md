@@ -226,9 +226,6 @@ With the IAM user created and credentials in hand, run:
 4. Install Claude Code via npm
 5. Configure `~/bin` on your PATH
 
-See `z_initial-setup-instructions.md` for the full step-by-step walkthrough
-including the launcher script, model selection, and troubleshooting.
-
 ---
 
 ## Usage
