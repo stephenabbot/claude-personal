@@ -310,6 +310,46 @@ Setting `ANTHROPIC_MODEL` in your environment skips the probe entirely.
 
 ---
 
+## Planned: role-based access for AWS operations
+
+> **Status:** design complete, implementation pending. See [TODO.md](TODO.md) for details.
+
+Today this project gives Claude exactly one capability: invoking Bedrock models. But
+Claude Code's real power is acting as your proxy — running CLI commands, analyzing
+deployed infrastructure, reading CloudWatch logs, inspecting resources, and
+occasionally making changes on your behalf.
+
+The planned extension uses **IAM AssumeRole** to grant Claude scoped authority beyond
+model invocation:
+
+| Role | Scope | Use case |
+|---|---|---|
+| `claude-bedrock` | Model invocation only | Current default — unchanged |
+| `claude-analyst` | Broad read-only | Log analysis, resource inspection, cost review, configuration audit |
+| `claude-operator` | Read + write | Deployments, remediation, resource modification |
+
+**How it will work:**
+
+```bash
+claude-personal                    # default: bedrock only
+claude-personal --role analyst     # broad read access to the account
+claude-personal --role operator    # read + write access
+```
+
+The base user (`a_bedrock_user`) gains only `sts:AssumeRole` — it remains the
+authentication gateway, not the authorization surface. Each role has its own trust
+policy requiring MFA, its own permission boundary, and its own IaC definition that
+can be PR-reviewed and versioned.
+
+**Why this matters for corporate adoption:** this pattern maps directly to how
+enterprises manage AI tool access — least privilege by default, explicit escalation,
+full CloudTrail audit trail, role revocation without breaking base access, and
+governance review via infrastructure-as-code. The project serves as a minimal
+proof-of-concept for authorized AI agent access in environments with compliance
+requirements.
+
+---
+
 ## Resource tagging
 
 AWS resources created by this project (SNS topics, Budgets) are tagged automatically.

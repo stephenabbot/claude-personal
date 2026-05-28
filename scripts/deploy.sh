@@ -550,7 +550,7 @@ if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
   fi
 
   if [[ -n "$NEWER_SAME_TIER" ]]; then
-    printf "${YELLOW}⚠${NC}  Newer model available: %s — enable in Bedrock console → Model access\n" "$NEWER_SAME_TIER"
+    printf "${YELLOW}⚠  Newer model available: %s — enable in Bedrock console → Model access${NC}\n" "$NEWER_SAME_TIER"
   fi
 
   export ANTHROPIC_MODEL="$SELECTED_MODEL"
