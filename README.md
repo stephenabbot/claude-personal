@@ -44,7 +44,8 @@ This project provides a small set of scripts that handle the full lifecycle:
 | `scripts/list-roles.sh` | Show deployed role stacks, status, ARNs, and last-updated time |
 | `scripts/destroy-role.sh` | Delete a specific role stack (prompts for confirmation) |
 | `scripts/costs.sh` | Show Bedrock model costs from Cost Explorer (`--last-week`, `--last-month`, `--days N`) |
-| `scripts/destroy.sh` | Full uninstall — removes Keychain entries, npm package, and launcher |
+| `scripts/alarms.sh` | Deploy or manage monthly spend alerts via AWS Budgets + SNS email notifications |
+| `scripts/destroy.sh` | Full uninstall — removes Keychain entries, npm package, launcher, and alarm infrastructure |
 | `scripts/test_creds.sh` | Verification — end-to-end connectivity test from Keychain through to Bedrock |
 | `config.sh` | Optional tag overrides (Owner, Environment, DeploymentId) — committed to repo, no secrets |
 
@@ -123,7 +124,10 @@ Paste the following, then name it `bedrock_mfa_policy` and save:
         "sns:CreateTopic",
         "sns:DeleteTopic",
         "sns:Subscribe",
+        "sns:Unsubscribe",
+        "sns:Publish",
         "sns:ListTopics",
+        "sns:ListSubscriptionsByTopic",
         "sns:GetTopicAttributes",
         "sns:SetTopicAttributes"
       ],
@@ -160,14 +164,14 @@ API request itself, not enforced by IAM. However since this account is used
 exclusively for Bedrock, there is nothing else to expose. The four actions granted
 are read-only — no ability to modify cost categories or access billing settings.
 
-**Note on Budgets and SNS scope:** The budget and SNS actions will be used by
-a planned `scripts/alarms.sh` to create a monthly spend alert with email notification.
+**Note on Budgets and SNS scope:** The budget and SNS actions are used by
+`scripts/alarms.sh` to create monthly spend alerts with email notifications.
 AWS Budgets uses a coarse permission model: `budgets:ModifyBudget` covers
 create, modify, and delete operations; `budgets:ViewBudget` covers all reads.
 These are scoped to budget management only — no access to billing data, cost
 categories, or other AWS resources. SNS actions are similarly limited: create a
-topic, subscribe an email address, and manage that topic. No ability to publish
-arbitrary messages or access other SNS topics.
+topic, subscribe an email address, publish test alerts, and manage that topic.
+No ability to access other SNS topics beyond the one created by this project.
 
 ### 3. Enable virtual MFA
 

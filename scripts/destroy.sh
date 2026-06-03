@@ -93,6 +93,26 @@ else
   miss "PATH entry" "not found in ~/.zshrc"
 fi
 
+# Alarm infrastructure (SNS topic + Budget)
+HAS_ALARMS=0
+ALARM_TOPIC_ARN=""
+ALARM_BUDGET_EXISTS=0
+if aws sts get-caller-identity &>/dev/null; then
+  ALARM_TOPICS=$(aws sns list-topics --output json 2>/dev/null || echo '{"Topics":[]}')
+  ALARM_TOPIC_ARN=$(echo "$ALARM_TOPICS" | jq -r '.Topics[].TopicArn' | grep ":claude-personal-alerts$" || echo "")
+  ALARM_ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "")
+  if [[ -n "$ALARM_ACCOUNT" ]] && aws budgets describe-budget --account-id "$ALARM_ACCOUNT" --budget-name "claude-personal-monthly" &>/dev/null; then
+    ALARM_BUDGET_EXISTS=1
+  fi
+  if [[ -n "$ALARM_TOPIC_ARN" || "$ALARM_BUDGET_EXISTS" -eq 1 ]]; then
+    HAS_ALARMS=1; ACTION_COUNT=$((ACTION_COUNT+1))
+    [[ -n "$ALARM_TOPIC_ARN" ]]      && pass "SNS topic"  "claude-personal-alerts"
+    [[ "$ALARM_BUDGET_EXISTS" -eq 1 ]] && pass "Budget"    "claude-personal-monthly"
+  fi
+else
+  miss "Alarm infrastructure" "no AWS session — skipping check"
+fi
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 2 — PLAN
 # ══════════════════════════════════════════════════════════════════════════════
@@ -112,6 +132,7 @@ fi
 [[ "$HAS_NPM_ARTIFACTS" -eq 1 ]] && printf "  ${RED}·${NC}  npm artifacts (package.json, package-lock.json, node_modules/)\n"
 [[ "$HAS_LAUNCHER"      -eq 1 ]] && printf "  ${RED}·${NC}  Launcher: %s\n" "$LAUNCHER"
 [[ "$HAS_PATH_ENTRY"    -eq 1 ]] && printf "  ${RED}·${NC}  PATH entry for ~/bin in ~/.zshrc\n"
+[[ "$HAS_ALARMS"        -eq 1 ]] && printf "  ${RED}·${NC}  Alarm infrastructure (SNS topic + Budget)\n"
 
 echo ""
 printf "${YELLOW}Scripts and documentation in %s are not affected.${NC}\n" "$PROJECT_DIR"
@@ -164,6 +185,25 @@ if [[ "$HAS_PATH_ENTRY" -eq 1 ]]; then
   sed -i '' '/export PATH="\$HOME\/bin:\$PATH"/d' "$HOME/.zshrc" 2>/dev/null \
     && printf "  ${GREEN}✓${NC}  PATH entry removed from ~/.zshrc\n" \
     || printf "  ${YELLOW}⚠${NC}  Could not remove PATH entry — remove manually from ~/.zshrc\n"
+fi
+
+if [[ "$HAS_ALARMS" -eq 1 ]]; then
+  if [[ "$ALARM_BUDGET_EXISTS" -eq 1 ]]; then
+    aws budgets delete-budget --account-id "$ALARM_ACCOUNT" --budget-name "claude-personal-monthly" 2>/dev/null \
+      && printf "  ${GREEN}✓${NC}  Budget removed: claude-personal-monthly\n" \
+      || printf "  ${YELLOW}⚠${NC}  Could not remove budget\n"
+  fi
+  if [[ -n "$ALARM_TOPIC_ARN" ]]; then
+    # Remove all subscriptions first
+    ALARM_SUBS=$(aws sns list-subscriptions-by-topic --topic-arn "$ALARM_TOPIC_ARN" --output json 2>/dev/null || echo '{"Subscriptions":[]}')
+    echo "$ALARM_SUBS" | jq -r '.Subscriptions[].SubscriptionArn' | while IFS= read -r sub_arn; do
+      [[ "$sub_arn" == "PendingConfirmation" || -z "$sub_arn" ]] && continue
+      aws sns unsubscribe --subscription-arn "$sub_arn" 2>/dev/null
+    done
+    aws sns delete-topic --topic-arn "$ALARM_TOPIC_ARN" 2>/dev/null \
+      && printf "  ${GREEN}✓${NC}  SNS topic removed: claude-personal-alerts\n" \
+      || printf "  ${YELLOW}⚠${NC}  Could not remove SNS topic\n"
+  fi
 fi
 
 echo ""

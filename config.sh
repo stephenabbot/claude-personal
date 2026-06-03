@@ -10,3 +10,7 @@
 # OWNER="YourName"        # default: IAM username of the deploying user
 # ENVIRONMENT="prd"       # default: prd
 # DEPLOYMENT_ID="Default" # default: Default
+
+# ── Alarm settings (scripts/alarms.sh) ──────────────────────────────────────
+# ALARM_THRESHOLDS="10,20,50"  # default: 10,20,50 — comma-separated USD values
+# ALARM_EMAIL=""               # required for alarms — no default

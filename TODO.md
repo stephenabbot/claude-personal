@@ -14,10 +14,3 @@
 - Consider updating notification to be more neutral: "not yet accessible — check Bedrock console for details"
 - Revisit once the new access model stabilizes and the distinction is clearer
 
-### scripts/alarms.sh
-- Create SNS topic + email subscription (requires user to confirm email)
-- Create AWS Budget linked to SNS topic
-- `--limit` flag for monthly spend threshold (default: $10)
-- Read tag values from config.sh; apply dynamic tags (DeployedBy, Project, Repository)
-- Pre-flight: check budgets + SNS permissions before attempting anything
-- Update destroy.sh to clean up SNS topic and Budget on uninstall
