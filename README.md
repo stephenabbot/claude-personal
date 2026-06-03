@@ -43,6 +43,7 @@ This project provides a small set of scripts that handle the full lifecycle:
 | `scripts/deploy-role.sh` | Deploy or update an operational role via CloudFormation (`--all` for all roles) |
 | `scripts/list-roles.sh` | Show deployed role stacks, status, ARNs, and last-updated time |
 | `scripts/destroy-role.sh` | Delete a specific role stack (prompts for confirmation) |
+| `scripts/costs.sh` | Show Bedrock model costs from Cost Explorer (`--last-week`, `--last-month`, `--days N`) |
 | `scripts/destroy.sh` | Full uninstall — removes Keychain entries, npm package, and launcher |
 | `scripts/test_creds.sh` | Verification — end-to-end connectivity test from Keychain through to Bedrock |
 | `config.sh` | Optional tag overrides (Owner, Environment, DeploymentId) — committed to repo, no secrets |

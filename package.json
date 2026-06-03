@@ -10,6 +10,6 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/claude-code": "^2.1.154"
+    "@anthropic-ai/claude-code": "^2.1.161"
   }
 }
