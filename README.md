@@ -208,13 +208,23 @@ Security credentials tab → **Access keys** → **Create access key**:
 
 ### 5. Verify Bedrock model access
 
-Serverless foundation models on Bedrock are now **automatically enabled** across all
-AWS commercial regions when first invoked — no manual activation required. The
-retired "Model access" page is no longer needed.
+Model availability on Bedrock depends on both region and account licensing:
+
+**Older models** (e.g., Claude Opus 4.6, Sonnet 4.5, Haiku 4.5) are **automatically
+enabled** across all AWS commercial regions on first invocation — no manual activation
+required.
+
+**Newer models** (e.g., Fable, Claude Opus 4.8, Opus 4.7) may be listed in the Bedrock
+catalog but require **AWS account licensing**. If a model shows "contact AWS support"
+or "AccessDeniedException" when invoked, your account does not have authorization for
+that model tier. Open an AWS support ticket to request access — there is no console
+workaround.
 
 > **First-time Anthropic users:** you may need to submit use case details before
 > models respond. Navigate to **Amazon Bedrock** in the console, select any
 > Anthropic model from the **Model catalog**, and follow the prompts if presented.
+> Note: this step enables account-licensed models only; it does not grant access to
+> newer models requiring sales authorization.
 
 Access control is managed entirely through IAM policies and Service Control Policies.
 The IAM policy in this project already grants `bedrock:InvokeModel` and
@@ -264,11 +274,11 @@ The launcher automatically selects the best Claude model your account has access
 without requiring any manual configuration.
 
 **How it works:** on first launch of a session the launcher queries Bedrock for all
-available Anthropic models in your region, ranks them by capability tier
+models listed in your region's catalog, ranks them by capability tier
 (Opus → Sonnet → Haiku), then probes each in order using a live 1-token invocation
 with an 8-second timeout. The first model that responds is used. This catches both
-access-denied errors (model not enabled) and throttling (model enabled but no
-capacity available on a new account).
+licensing errors (model exists but your account is not authorized) and throttling
+(model authorized but no capacity available on new accounts).
 
 | Priority | Tier | Example models |
 |---|---|---|
@@ -285,7 +295,7 @@ The launcher prints the selected model at startup:
 If Opus is not available it falls back and prints a notice:
 
 ```
-⚠  Model: us.anthropic.claude-sonnet-4-6 (Opus not available — check IAM policy or try invoking once in console)
+⚠  Model: us.anthropic.claude-sonnet-4-6 (Opus not available — may require AWS authorization)
 ```
 
 **Newer model notifications:** when a newer model in the same tier exists in the
@@ -293,7 +303,7 @@ Bedrock catalog but did not respond during probing, the launcher prints a single
 yellow notice:
 
 ```
-⚠  Newer model available: anthropic.claude-opus-4-8 — try invoking in Bedrock console to activate
+⚠  Newer model available: anthropic.claude-opus-4-8 — may require AWS account authorization
 ```
 
 This only notifies within the same tier — if you are running Opus, it alerts about
@@ -302,9 +312,10 @@ upgrading to a different tier. The notification is informational only and does n
 change behavior. It appears once per session (on the initial probe) and is cached
 along with the model selection for the remainder of the 6-hour session.
 
-Since Bedrock models are auto-enabled on first invocation, the fix is typically to
-invoke the model once via the Bedrock console playground or check that your IAM
-policy does not restrict access to that specific model.
+**Why a model fails to probe:** if a model is in the Bedrock catalog but probe fails,
+it is typically because your account is not licensed to use it. Invoking via the Bedrock
+console or checking IAM policy will not help if the licensing issue is at the account
+level. See [Troubleshooting](#troubleshooting) below.
 
 The selected model is **cached for the duration of the 6-hour session** — the probe
 runs once per session. Subsequent `claude-personal` launches within the same session
@@ -322,6 +333,35 @@ ANTHROPIC_MODEL=us.anthropic.claude-sonnet-4-6 claude-personal
 ```
 
 Setting `ANTHROPIC_MODEL` in your environment skips the probe entirely.
+
+---
+
+## Troubleshooting
+
+### "Contact AWS support" or "AccessDeniedException" when invoking a model
+
+This error means your AWS account does not have authorization to use that model,
+even though it is listed in the Bedrock catalog. This is a **licensing issue**, not
+a configuration issue.
+
+**Solution:** Open an AWS support ticket requesting access to the specific model
+(include the full model name, e.g., `anthropic.claude-opus-4-8` or `anthropic.claude-fable-2-1`).
+The "try invoking in console" suggestion will not resolve this — it requires AWS
+account authorization that only AWS support can grant.
+
+**Timeline:** AWS support tickets for new model access typically take 3–7 business
+days. Once authorized, retry `claude-personal` to probe and select the newly available
+model.
+
+### Model selection falls back to Haiku even though Opus is enabled
+
+If the launcher cannot reach Opus despite your account being authorized, the issue
+is typically capacity limits on new accounts. Bedrock cross-region inference for Opus
+starts with very low throughput and increases with usage. The launcher will retry
+on the next session start (after your 6-hour MFA session expires).
+
+To accelerate: invoke Opus once via the Bedrock console to establish usage history,
+then start a new `claude-personal` session.
 
 ---
 

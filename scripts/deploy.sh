@@ -565,11 +565,11 @@ if [[ -z "${ANTHROPIC_MODEL:-}" ]]; then
   if echo "$SELECTED_MODEL" | grep -qi "opus"; then
     printf "${GREEN}✓${NC}  Model: %s\n" "$SELECTED_MODEL"
   else
-    printf "${YELLOW}⚠${NC}  Model: %s (Opus not available — try invoking once in Bedrock console or check IAM policy)\n" "$SELECTED_MODEL"
+    printf "${YELLOW}⚠${NC}  Model: %s (Opus not available — may require AWS account authorization)\n" "$SELECTED_MODEL"
   fi
 
   if [[ -n "$NEWER_SAME_TIER" ]]; then
-    printf "${YELLOW}⚠  Newer model available: %s — try invoking in Bedrock console to activate${NC}\n" "$NEWER_SAME_TIER"
+    printf "${YELLOW}⚠  Newer model available: %s — may require AWS account authorization${NC}\n" "$NEWER_SAME_TIER"
   fi
 
   export ANTHROPIC_MODEL="$SELECTED_MODEL"
