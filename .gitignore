@@ -38,3 +38,7 @@ CONTEXT.md
 *.log
 *.tmp
 *.temp
+
+# ── claude code scratch files ─────────────────────────────────────────────────
+z_commands.sh
+z_results.txt

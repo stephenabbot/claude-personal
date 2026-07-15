@@ -215,6 +215,35 @@ else
   ok "SNS topic exists: $TOPIC_ARN"
 fi
 
+# ── set SNS topic policy for AWS Budgets ─────────────────────────────────────
+
+step "Setting SNS topic policy for AWS Budgets..."
+
+TOPIC_POLICY=$(jq -n \
+  --arg arn "$TOPIC_ARN" \
+  --arg acct "$ACCOUNT_ID" \
+  '{
+    Version: "2012-10-17",
+    Statement: [{
+      Sid: "AWSBudgets-notification",
+      Effect: "Allow",
+      Principal: {Service: "budgets.amazonaws.com"},
+      Action: "SNS:Publish",
+      Resource: $arn,
+      Condition: {
+        StringEquals: {"aws:SourceAccount": $acct},
+        ArnLike: {"aws:SourceArn": ("arn:aws:budgets::" + $acct + ":*")}
+      }
+    }]
+  }')
+
+aws sns set-topic-attributes \
+  --topic-arn "$TOPIC_ARN" \
+  --attribute-name Policy \
+  --attribute-value "$TOPIC_POLICY" 2>&1 \
+  && ok "SNS topic policy set (AWS Budgets can publish)" \
+  || { fail "Failed to set SNS topic policy"; exit 1; }
+
 # ── manage email subscription ────────────────────────────────────────────────
 
 NEED_CONFIRM=0
